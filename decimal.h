@@ -31,16 +31,12 @@ Decimal __decimal_new ( const char* str ); // make new decimal variable
 const char* decimal_to_cstring ( Decimal x ); // cast decimal type to cstring
 Decimal decimal_format ( Decimal x,int integer, int fraction ); // decimal number formatting
 													// ex 0.5 to (integer:2, fraction:3) -> 00.500
-/*
+
 int decimal_digit ( Decimal x, int n ); // 10^n's digit of decimal variable
 int __decimal_read ( Decimal x, int n );
-Decimal_format decimal_get_format ( Decimal x ); 
-
 bool decimal_is_negative ( Decimal x ); // return true if x is negative, return false if not.
 
-
-
-
+/*
 int decimal_compare ( Decimal x, Decimal y ); // compare two decimal variables : -1 x < y, 0 x == y, 1 x > y
 Decimal decimal_add ( Decimal x, Decimal y ); // add two decimal variables
 Decimal decimal_sub ( Decimal x, Decimal y ); // subtract two decimal variables
