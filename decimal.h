@@ -1,6 +1,7 @@
 #ifndef __DECIMAL_H__
 #define __DECIMAL_H__
 
+#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
@@ -28,18 +29,32 @@ typedef struct Decimal_format {
 #define decimal_new(X) __decimal_new(#X)
 
 Decimal __decimal_new ( const char* str ); // make new decimal variable
+Decimal decimal_from_int(int x);
+Decimal decimal_from_longlong(long long x);
+
 const char* decimal_to_cstring ( Decimal x ); // cast decimal type to cstring
-Decimal decimal_format ( Decimal x,int integer, int fraction ); // decimal number formatting
+Decimal decimal_make_format ( Decimal x,int integer, int fraction ); // decimal number formatting
 													// ex 0.5 to (integer:2, fraction:3) -> 00.500
 
 int decimal_digit ( Decimal x, int n ); // 10^n's digit of decimal variable
+void decimal_set_digit(Decimal x, int n, int value);
+
 int __decimal_read ( Decimal x, int n );
+void __decimal_write(char* ptr, int loc, int value);
+int __decimal_len(Decimal_format fmt);
 bool decimal_is_negative ( Decimal x ); // return true if x is negative, return false if not.
 
-/*
+Decimal_format decimal_format(Decimal x);
+
+Decimal decimal_negative(Decimal x);
 int decimal_compare ( Decimal x, Decimal y ); // compare two decimal variables : -1 x < y, 0 x == y, 1 x > y
+
+void decimal_free(Decimal x);
+
+Decimal decimal_trim(Decimal x);
+Decimal decimal_shift(Decimal x, int n);
+
 Decimal decimal_add ( Decimal x, Decimal y ); // add two decimal variables
 Decimal decimal_sub ( Decimal x, Decimal y ); // subtract two decimal variables
 
-*/
 #endif
