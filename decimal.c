@@ -33,12 +33,10 @@ Decimal __decimal_new ( const char* str ) {
 			int value = ( str [ i ] - '0' ) & 0xF;
 			__decimal_write ( ptr, loc++, value );
 		} else {
-			fpoint = i;
+			fpoint = loc;
 			__decimal_write ( ptr, loc++, 0xF );
 		}
 	}
-
-	__decimal_write ( ptr, loc++, 0xF );
 
 	if( fpoint == -1 ) {
 		bits++;
@@ -562,3 +560,133 @@ Decimal decimal_sub ( Decimal x, Decimal y ) {
 
 	return ret;
 }
+Decimal decimal_mul ( Decimal x, Decimal y ) {
+	if( decimal_is_negative ( x ) && decimal_is_negative ( y ) ) {
+		Decimal xneg = decimal_negative ( x );
+		Decimal yneg = decimal_negative ( y );
+		Decimal ret = decimal_mul ( xneg, yneg );
+
+		decimal_free ( xneg );
+		decimal_free ( yneg );
+		return ret;
+	} else if( decimal_is_negative ( x ) && !decimal_is_negative ( y ) ) {
+		Decimal xneg = decimal_negative ( x );
+		Decimal mul = decimal_mul ( xneg, y );
+		Decimal ret = decimal_negative ( mul );
+
+		decimal_free ( xneg );
+		decimal_free ( mul );
+
+		return ret;
+	} else if( !decimal_is_negative ( x ) && decimal_is_negative ( y ) ) {
+		Decimal yneg = decimal_negative ( y );
+		Decimal mul = decimal_mul ( x, yneg );
+		Decimal ret = decimal_negative ( mul );
+
+		decimal_free ( yneg );
+		decimal_free ( mul );
+
+		return ret;
+	}
+	Decimal ret;
+
+	Decimal mul;
+	Decimal shift;
+
+	Decimal_format xfmt = decimal_format ( x );
+	Decimal_format yfmt = decimal_format ( y );
+
+	Decimal X = decimal_shift ( x, xfmt.fraction );
+	Decimal Y = decimal_shift ( y, yfmt.fraction );
+
+	int xlen = X.len - 1;
+	int ylen = Y.len - 1;
+
+	mul = decimal_from_int ( 0 );
+
+	for( int i = 0; i < xlen; i++ ) {
+		int overflow = 0;
+		char* str = (char*) malloc((ylen + 3) / 2);
+		for( int i = 0; i < (ylen + 3) / 2; i++ ) {
+			str [ i ] = 0;
+		}
+		__decimal_write ( str, ylen + 2, 0xF );
+
+		Decimal temp = {str, ylen+3, ylen+2};
+
+		for( int j = 0; j < ylen + 1; j++ ) {
+			int value1 = decimal_digit ( X, i );
+			int value2 = decimal_digit ( Y, j );
+			int value = value1 * value2 + overflow;
+			overflow = value / 10;
+
+			decimal_set_digit ( temp, j, value % 10 );
+		}
+
+		Decimal old = mul;
+		Decimal temp2 = decimal_shift ( temp, i );
+		mul = decimal_add ( mul, temp2 );
+
+		decimal_free ( temp );
+		decimal_free ( temp2 );
+		decimal_free ( old );
+	}
+
+
+	shift = decimal_shift ( mul, -xfmt.fraction - yfmt.fraction );
+	ret = decimal_trim ( shift );
+
+	decimal_free ( X );
+	decimal_free ( Y );
+	decimal_free ( mul );
+	decimal_free ( shift );
+
+	return ret;
+}
+/*
+Decimal_div_result decimal_div ( Decimal x, Decimal y, int p ) {
+	if( decimal_is_negative ( x ) && decimal_is_negative ( y ) ) {
+		Decimal xneg = decimal_negative ( x );
+		Decimal yneg = decimal_negative ( y );
+		Decimal_div_result ret = decimal_div ( xneg, yneg, p );
+
+		decimal_free ( xneg );
+		decimal_free ( yneg );
+		return ret;
+	} else if( decimal_is_negative ( x ) && !decimal_is_negative ( y ) ) {
+		Decimal xneg = decimal_negative ( x );
+		Decimal_div_result div = decimal_div ( xneg, y, p );
+		Decimal_div_result ret = { decimal_negative ( div.Q ), decimal_negative ( div.R ) };
+
+		decimal_free ( xneg );
+		decimal_free ( div.Q );
+		decimal_free ( div.R );
+
+		return ret;
+	} else if( !decimal_is_negative ( x ) && decimal_is_negative ( y ) ) {
+		Decimal yneg = decimal_negative ( x );
+		Decimal_div_result div = decimal_div ( x, yneg, p );
+		Decimal_div_result ret = { decimal_negative ( div.Q ), decimal_negative ( div.R ) };
+
+		decimal_free ( yneg );
+		decimal_free ( div.Q );
+		decimal_free ( div.R );
+
+		return ret;
+	}
+
+	Decimal_div_result ret;
+
+	Decimal_format xfmt = decimal_format ( x );
+	Decimal_format yfmt = decimal_format ( y );
+
+	int shift = xfmt.fraction + yfmt.fraction;
+
+	Decimal X = decimal_shift ( x, shift );
+	Decimal Y = decimal_shift ( y, shift );
+
+
+
+	return ret;
+}
+*/
