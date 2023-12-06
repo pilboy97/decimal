@@ -26,6 +26,10 @@ typedef struct Decimal_format {
 	int integer;
 	int fraction;
 } Decimal_format;
+typedef struct Decimal_div_result {
+	Decimal Q;
+	Decimal R;
+} Decimal_div_result;
 
 #define decimal_new(X) __decimal_new(#X)
 
@@ -57,5 +61,6 @@ Decimal decimal_shift ( Decimal x, int n );
 
 Decimal decimal_add ( Decimal x, Decimal y ); // add two decimal variables
 Decimal decimal_sub ( Decimal x, Decimal y ); // subtract two decimal variables
-
+Decimal decimal_mul ( Decimal x, Decimal y );
+//Decimal_div_result decimal_div ( Decimal x, Decimal y, int p );
 #endif
