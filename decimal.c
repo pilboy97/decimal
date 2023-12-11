@@ -369,11 +369,11 @@ Decimal decimal_shift(Decimal x, int n) {
 	if(neo.integer < 0) neo.integer = 0;
 	if(neo.fraction < 0) neo.fraction = 0;
 
-	Decimal ret = __decimal_new(neo.fraction + neo.integer + 2);
-	decimal_write(ret, neo.integer + 1, 0xF);
-	ret.fpoint = neo.integer + 1;
+	Decimal ret = __decimal_new(neo.fraction + neo.integer + 3);
+	decimal_write(ret, neo.integer + 2, 0xF);
+	ret.fpoint = neo.integer + 2;
 
-	for(int i = -fmt.fraction; i <= fmt.integer; i++) {
+	for(int i = -fmt.fraction; i < fmt.integer; i++) {
 		int value = decimal_digit(x, i);
 		decimal_set_digit(ret, i + n, value);
 	}
@@ -422,126 +422,6 @@ Decimal decimal_abs(Decimal x) {
 	return decimal_negative(x);
 }
 
-Decimal decimal_pow(Decimal x,int n) {
-	if(n == 0) return decimal_from_int(1);
-	if(n == 1) return decimal_copy(x);
-
-
-	Decimal X = decimal_pow(x, n / 2);
-	Decimal ret = decimal_mul(X, X);
-
-	if(n % 2 == 1) {
-		Decimal ret_old = ret;
-		decimal_free(ret_old);
-
-		ret = decimal_mul(ret, x);
-	}
-
-	decimal_free(X);
-	return ret;
-}
-
-Decimal decimal_factorial(Decimal x) {
-	if(decimal_compare(x, decimal_from_int(0)) == 0) {
-		return decimal_from_int(1);
-	}
-	if(decimal_compare(x, decimal_from_int(1)) == 0) {
-		return decimal_from_int(1);
-	}
-
-	Decimal i = decimal_from_int(1);
-	Decimal ret = decimal_from_int(1);
-
-	while(decimal_compare(i, x) <= 0) {
-		Decimal ret_old = ret;
-		Decimal i_old = i;
-
-		ret = decimal_mul(ret, i);
-		i = decimal_inc(i);
-
-		decimal_free(ret_old);
-		decimal_free(i_old);
-	}
-
-	decimal_free(i);
-
-	return ret;
-}
-
-Decimal decimal_pi() {
-	Decimal ret = decimal_from_int(0);
-
-	for(int i = 0; i < 5; i++) {
-		Decimal m1 = decimal_from_int(-1);
-		Decimal sign = decimal_pow(m1, i);
-		Decimal Q = decimal_from_int(2 * i + 1);
-
-		Decimal ret_old = ret;
-
-		Decimal_div_result res = decimal_div(sign, Q, 30);
-		
-		printf("%s %s %s\n", decimal_to_cstring(sign), decimal_to_cstring(Q) , decimal_to_cstring(res.Q));
-
-		ret = decimal_add(ret, res.Q);
-
-		decimal_free(m1);
-		decimal_free(sign);
-		decimal_free(Q);
-		decimal_free(ret_old);
-		decimal_free(res.Q);
-		decimal_free(res.R);
-	}
-
-	Decimal ret_old = ret;
-	Decimal four = decimal_from_int(4);
-	ret = decimal_mul(ret, four);
-	return ret;
-}
-
-Decimal decimal_sin(Decimal x) {
-	Decimal ret = decimal_from_int(0);
-	
-	for(int i = 0; i < 100; i++) {
-		Decimal m1 = decimal_from_int(-1);
-		Decimal sign = decimal_pow(m1, i);
-		Decimal X = decimal_pow(x, 2 * i + 1);
-		Decimal q = decimal_from_int(2 * i + 1);
-		Decimal F = decimal_factorial(q);
-
-		Decimal X2 = decimal_mul(sign, X);
-		Decimal_div_result res = decimal_div(X2, F,100);
-
-		Decimal ret_old = ret;
-		ret = decimal_add(ret, res.Q);
-
-		decimal_free(m1);
-		decimal_free(q);
-		decimal_free(sign);
-		decimal_free(X);
-		decimal_free(F);
-		decimal_free(X2);
-		decimal_free(res.Q);
-		decimal_free(res.R);
-	}
-
-	return ret;
-}
-
-Decimal decimal_cos(Decimal x) {
-
-}
-
-Decimal decimal_exp(Decimal x) {
-
-}
-Decimal decimal_ln(Decimal x) {
-
-}
-
-Decimal decimal_sqrt(Decimal x) {
-
-}
-
 Decimal decimal_add(Decimal x, Decimal y) {
 	if(decimal_is_negative(x) && decimal_is_negative(y)) {
 		Decimal xneg = decimal_negative(x);
@@ -555,12 +435,17 @@ Decimal decimal_add(Decimal x, Decimal y) {
 
 		return ret;
 	} else if(!decimal_is_negative(x) && decimal_is_negative(y)) {
-		Decimal ret = decimal_sub(x, y);
+		Decimal yneg = decimal_negative(y);
+		Decimal ret = decimal_sub(x, yneg);
+
+		decimal_free(yneg);
 
 		return ret;
 	} else if(decimal_is_negative(x) && !decimal_is_negative(y)) {
-		Decimal ret = decimal_sub(y, x);
+		Decimal xneg = decimal_negative(x);
+		Decimal ret = decimal_sub(y, xneg);
 
+		decimal_free(xneg);
 		return ret;
 	}
 	Decimal ret;
@@ -873,6 +758,8 @@ Decimal decimal_copy(Decimal x) {
 	for(int i = 0; i < x.len; i++) {
 		decimal_write(ret, i, __decimal_read(x, i));
 	}
+
+	ret.fpoint = x.fpoint;
 
 	return ret;
 }
