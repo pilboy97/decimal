@@ -31,9 +31,11 @@ typedef struct Decimal_div_result {
 	Decimal R;
 } Decimal_div_result;
 
-#define decimal_new(X) __decimal_new(#X)
+#define decimal_new(X) decimal_from_cstring(#X)
 
-Decimal __decimal_new(const char* str); // make new decimal variable
+Decimal __decimal_new(int len);
+
+Decimal decimal_from_cstring(const char* str); // make new decimal variable
 Decimal decimal_from_int(int x);
 Decimal decimal_from_longlong(long long x);
 
@@ -47,6 +49,7 @@ void decimal_set_digit(Decimal x, int n, int value);
 int __decimal_read(Decimal x, int n);
 void __decimal_write(char* ptr, int loc, int value);
 int __decimal_len(Decimal_format fmt);
+void decimal_write(Decimal x, int loc, int v);
 bool decimal_is_negative(Decimal x); // return true if x is negative, return false if not.
 
 Decimal_format decimal_format(Decimal x);
@@ -58,6 +61,28 @@ void decimal_free(Decimal x);
 
 Decimal decimal_trim(Decimal x);
 Decimal decimal_shift(Decimal x, int n);
+
+Decimal decimal_max(Decimal x, Decimal y);
+Decimal decimal_min(Decimal x, Decimal y);
+Decimal decimal_abs(Decimal x);
+
+Decimal decimal_inc(Decimal x);
+Decimal decimal_dec(Decimal x);
+
+Decimal decimal_factorial(Decimal x);
+
+Decimal decimal_sin(Decimal x);
+Decimal decimal_cos(Decimal x);
+Decimal decimal_tan(Decimal x);
+
+Decimal decimal_exp(Decimal x);
+Decimal decimal_sqrt(Decimal x);
+
+Decimal decimal_pow(Decimal x, int n);
+
+Decimal decimal_pi();
+
+Decimal decimal_copy(Decimal x);
 
 Decimal decimal_add(Decimal x, Decimal y); // add two decimal variables
 Decimal decimal_sub(Decimal x, Decimal y); // subtract two decimal variables
