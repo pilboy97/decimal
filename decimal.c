@@ -1,6 +1,27 @@
 #include "decimal.h"
 
-Decimal __decimal_new(const char* str) {
+Decimal __decimal_new(int len) {
+	Decimal ret;
+
+	if((len + 1) / 2 < 4)
+		len = 8;
+	
+	char * ptr = (char*) malloc(((len + 1) / 2 + 1) * sizeof(char));
+	
+	if(ptr == NULL) {
+		panic("failed to malloc");
+	}
+
+	ret.len = len;
+	ret.ptr = ptr;
+
+	for(int i = 0; i < (len + 1) / 2 + 1; i++) {
+		ptr[i] = 0;
+	}
+
+	return ret;
+}
+Decimal decimal_from_cstring(const char* str) {
 	Decimal ret;
 	int len = strlen(str);
 	int bits;
@@ -16,14 +37,11 @@ Decimal __decimal_new(const char* str) {
 		bits = 1 + (len);
 	}
 
-	char* ptr = (char*) malloc((bits + 1) / 2 + 1);
+	ret = __decimal_new(bits);
 
-	for(int i = 0; i < (bits + 1) / 2 + 1; i++) {
-		ptr[i] = 0;
-	}
 
 	if(isNeg) {
-		__decimal_write(ptr, 0, 0xF);
+		decimal_write(ret, 0, 0xF);
 	}
 
 	int loc = 1;
@@ -31,10 +49,10 @@ Decimal __decimal_new(const char* str) {
 	for(int i = start; i < len; i++) {
 		if(str[i] != '.') {
 			int value = (str[i] - '0') & 0xF;
-			__decimal_write(ptr, loc++, value);
+			decimal_write(ret, loc++, value);
 		} else {
 			fpoint = loc;
-			__decimal_write(ptr, loc++, 0xF);
+			decimal_write(ret, loc++, 0xF);
 		}
 	}
 
@@ -42,15 +60,16 @@ Decimal __decimal_new(const char* str) {
 		bits++;
 		fpoint = bits - 1;
 
-		__decimal_write(ptr, bits - 1, 0xF);
+		decimal_write(ret, bits - 1, 0xF);
 	}
 
 	ret.len = bits;
-	ret.ptr = ptr;
+	ret.ptr = ret.ptr;
 	ret.fpoint = fpoint;
 
+	Decimal ret_old = ret;
 	ret = decimal_trim(ret);
-	free(ptr);
+	decimal_free(ret_old);
 
 	return ret;
 }
@@ -63,7 +82,6 @@ Decimal decimal_from_longlong(long long x) {
 	Decimal ret;
 	bool isNeg = x < 0;
 	int len = 0;
-	char* str;
 
 	if(isNeg) {
 		x = -x;
@@ -76,22 +94,18 @@ Decimal decimal_from_longlong(long long x) {
 
 	len += 2;
 
-	str = (char*) malloc((len + 1) / 2);
-	for(int i = 0; i < (len + 1) / 2; i++) {
-		str[i] = 0;
-	}
+	ret = __decimal_new(len);
 
 	if(isNeg) {
-		__decimal_write(str, 0, 0xF);
+		decimal_write(ret, 0, 0xF);
 	}
 
-	__decimal_write(str, (len - 1), 0xF);
+	decimal_write(ret, (len - 1), 0xF);
 	for(int i = len - 2; i >= 1; i--) {
-		__decimal_write(str, i, x % 10);
+		decimal_write(ret, i, x % 10);
 		x /= 10;
 	}
 
-	ret.ptr = str;
 	ret.len = len;
 	ret.fpoint = ret.len - 1;
 	return ret;
@@ -145,35 +159,26 @@ Decimal decimal_make_format(Decimal x, int integer, int fraction) {
 	Decimal ret;
 
 	int len = 1 + integer + 1 + fraction;
-	char* str;
 	int header = 0;
 
+	ret = __decimal_new(len);
+
 	if(decimal_is_negative(x)) {
-		str = (char*) malloc((len + 1) / 2 + 1);
-		for(int i = 0; i < (len + 1) / 2 + 1; i++)
-			str[i] = 0;
-
-		__decimal_write(str, header++, 0xF);
+		decimal_write(ret, header++, 0xF);
 	} else {
-		str = (char*) malloc((len + 1) / 2 + 1);
-		for(int i = 0; i < (len + 1) / 2 + 1; i++)
-			str[i] = 0;
-
-		__decimal_write(str, header++, 0x0);
+		decimal_write(ret, header++, 0x0);
 	}
 
 
 	for(int i = integer - 1; i >= 0; i--) {
-		__decimal_write(str, header++, decimal_digit(x, i));
+		decimal_write(ret, header++, decimal_digit(x, i));
 	}
 	ret.fpoint = header;
-	__decimal_write(str, header++, 0xF);
+	decimal_write(ret, header++, 0xF);
 	for(int i = 1; i <= fraction; i++) {
-		__decimal_write(str, header++, decimal_digit(x, -i));
+		decimal_write(ret, header++, decimal_digit(x, -i));
 	}
 
-	ret.len = len;
-	ret.ptr = str;
 	return ret;
 }
 
@@ -195,28 +200,20 @@ int decimal_digit(Decimal x, int n) {
 	return 0;
 }
 void decimal_set_digit(Decimal x, int n, int v) {
+	int fpoint = x.fpoint;
 
-	int fpoint = -1;
+	int loc = fpoint - n - ((n >= 0) ? 1 : 0);
 
-	for(int i = 1; i < x.len; i++) {
-		int value;
-		value = __decimal_read(x, i);
-
-		if(value == 0xF) {
-			int loc = i - n - ((n >= 0) ? 1 : 0);
-
-			if(loc >= 1 && loc < x.len) {
-				__decimal_write(x.ptr, loc, v);
-				return;
-			} else {
-				return;
-			}
-		}
+	if(loc >= 1 && loc < x.len) {
+		decimal_write(x, loc, v);
+		return;
+	} else {
+		return;
 	}
 
-	int loc = x.len - n - 1;
+	loc = x.len - n - 1;
 	if(loc >= 1 && loc < x.len) {
-		__decimal_write(x.ptr, loc, v);
+		decimal_write(x, loc, v);
 	}
 
 	return;
@@ -279,16 +276,20 @@ int decimal_compare(Decimal x, Decimal y) {
 }
 Decimal decimal_negative(Decimal x) {
 	Decimal ret;
-	char* str = (char*) malloc((x.len + 1) / 2);
-	memcpy(str, x.ptr, (x.len + 1) / 2);
 
-	if(decimal_is_negative(x))
-		__decimal_write(str, 0, 0x0);
-	else
-		__decimal_write(str, 0, 0xF);
+	ret = __decimal_new(x.len);
 
-	ret.ptr = str;
-	ret.len = x.len;
+	if(__decimal_read(x, 0) == 0xF) {
+		decimal_write(ret, 0, 0x0);
+	} else {
+		decimal_write(ret, 0, 0xF);
+	}
+
+	for(int i = 1; i < x.len; i++) {
+		int value = __decimal_read(x, i);
+		decimal_write(ret, i, value);
+	}
+
 	ret.fpoint = x.fpoint;
 
 	return ret;
@@ -302,14 +303,21 @@ int __decimal_len(Decimal_format fmt) {
 	return (fmt.integer + fmt.fraction + 2) / 2;
 }
 
+void decimal_write(Decimal x, int loc, int v) {
+	if(0 <= loc && loc < x.len)
+		__decimal_write(x.ptr, loc, v);
+	else
+		puts("!!");
+}
+
 Decimal decimal_trim(Decimal x) {
 	Decimal ret;
 	Decimal_format fmt = decimal_format(x);
 	bool neg = decimal_is_negative(x);
 
-	int start = 0;
+	int start = -1;
 	int end = 0;
-	for(int i = fmt.integer - 1; i >= 1; i--) {
+	for(int i = fmt.integer - 1; i >= 0; i--) {
 		if(decimal_digit(x, i) != 0) {
 			start = i;
 			break;
@@ -321,30 +329,30 @@ Decimal decimal_trim(Decimal x) {
 			break;
 		}
 	}
+	
+	if(end == 0 && start == -1)
+		return decimal_from_int(0);
 
-	char* str = (char*) malloc((end + start + 1 + 2) / 2 + 1);
+	if(start == -1) start = 0;
+
+	ret = __decimal_new(end + start + 3);
 	int header = 1;
 
-	for(int i = 0; i < (end + start + 3) / 2 + 1; i++) {
-		str[i] = 0;
-	}
-
 	if(neg) {
-		__decimal_write(str, 0, 0xF);
+		decimal_write(ret, 0, 0xF);
 	}
 
 	for(int i = start; i >= 0; i--) {
-		__decimal_write(str, header++, decimal_digit(x, i));
+		decimal_write(ret, header++, decimal_digit(x, i));
 	}
 
 	ret.fpoint = header;
-	__decimal_write(str, header++, 0xF);
+	decimal_write(ret, header++, 0xF);
 
 	for(int i = 1; i <= end; i++) {
-		__decimal_write(str, header++, decimal_digit(x, -i));
+		decimal_write(ret, header++, decimal_digit(x, -i));
 	}
 
-	ret.ptr = str;
 	ret.len = header;
 
 	return ret;
@@ -353,40 +361,185 @@ Decimal decimal_trim(Decimal x) {
 
 Decimal decimal_shift(Decimal x, int n) {
 	Decimal_format fmt = decimal_format(x);
-	Decimal ret;
+	Decimal_format neo = fmt;
 
-	char* str;
+	neo.integer += n;
+	neo.fraction -= n;
 
-	if(n >= -fmt.integer && n <= fmt.fraction) {
-		ret.len = x.len;
-	} else if(n < -fmt.integer) {
-		ret.len = x.len - fmt.integer + n;
-	} else {
-		ret.len = x.len - fmt.fraction + n;
-	}
+	if(neo.integer < 0) neo.integer = 0;
+	if(neo.fraction < 0) neo.fraction = 0;
 
-	str = (char*) malloc((ret.len + 1) / 2);
-	for(int i = 0; i < (ret.len + 1) / 2; i++) {
-		str[i] = 0;
-	}
-	ret.ptr = str;
-
-	for(int i = 1; i < x.len; i++) {
-		if(__decimal_read(x, i) == 0xF) {
-			__decimal_write(str, i + n, 0xF);
-			ret.fpoint = i + n;
-			break;
-		}
-	}
+	Decimal ret = __decimal_new(neo.fraction + neo.integer + 2);
+	decimal_write(ret, neo.integer + 1, 0xF);
+	ret.fpoint = neo.integer + 1;
 
 	for(int i = -fmt.fraction; i <= fmt.integer; i++) {
-		decimal_set_digit(ret, i + n, decimal_digit(x, i));
+		int value = decimal_digit(x, i);
+		decimal_set_digit(ret, i + n, value);
 	}
 
+	Decimal ret_old = ret;
 	ret = decimal_trim(ret);
-	free(str);
+	decimal_free(ret_old);
 
 	return ret;
+}
+
+Decimal decimal_inc(Decimal x) {
+	Decimal one = decimal_from_int(1);
+	Decimal ret = decimal_add(x, one);
+	
+	decimal_free(one);
+	return ret;
+}
+Decimal decimal_dec(Decimal x) {
+	Decimal one = decimal_from_int(1);
+	Decimal ret = decimal_sub(x, one);
+
+	decimal_free(one);
+	return ret;
+}
+
+Decimal decimal_max(Decimal x, Decimal y) {
+	if(decimal_compare(x, y) > 0) {
+		return decimal_copy(x);
+	}
+
+	return y;
+}
+Decimal decimal_min(Decimal x, Decimal y) {
+	if(decimal_compare(x, y) < 0) {
+		return decimal_copy(x);
+	}
+
+	return y;
+}
+Decimal decimal_abs(Decimal x) {
+	if(!decimal_is_negative(x)) {
+		return decimal_copy(x);
+	}
+
+	return decimal_negative(x);
+}
+
+Decimal decimal_pow(Decimal x,int n) {
+	if(n == 0) return decimal_from_int(1);
+	if(n == 1) return decimal_copy(x);
+
+
+	Decimal X = decimal_pow(x, n / 2);
+	Decimal ret = decimal_mul(X, X);
+
+	if(n % 2 == 1) {
+		Decimal ret_old = ret;
+		decimal_free(ret_old);
+
+		ret = decimal_mul(ret, x);
+	}
+
+	decimal_free(X);
+	return ret;
+}
+
+Decimal decimal_factorial(Decimal x) {
+	if(decimal_compare(x, decimal_from_int(0)) == 0) {
+		return decimal_from_int(1);
+	}
+	if(decimal_compare(x, decimal_from_int(1)) == 0) {
+		return decimal_from_int(1);
+	}
+
+	Decimal i = decimal_from_int(1);
+	Decimal ret = decimal_from_int(1);
+
+	while(decimal_compare(i, x) <= 0) {
+		Decimal ret_old = ret;
+		Decimal i_old = i;
+
+		ret = decimal_mul(ret, i);
+		i = decimal_inc(i);
+
+		decimal_free(ret_old);
+		decimal_free(i_old);
+	}
+
+	decimal_free(i);
+
+	return ret;
+}
+
+Decimal decimal_pi() {
+	Decimal ret = decimal_from_int(0);
+
+	for(int i = 0; i < 5; i++) {
+		Decimal m1 = decimal_from_int(-1);
+		Decimal sign = decimal_pow(m1, i);
+		Decimal Q = decimal_from_int(2 * i + 1);
+
+		Decimal ret_old = ret;
+
+		Decimal_div_result res = decimal_div(sign, Q, 30);
+		
+		printf("%s %s %s\n", decimal_to_cstring(sign), decimal_to_cstring(Q) , decimal_to_cstring(res.Q));
+
+		ret = decimal_add(ret, res.Q);
+
+		decimal_free(m1);
+		decimal_free(sign);
+		decimal_free(Q);
+		decimal_free(ret_old);
+		decimal_free(res.Q);
+		decimal_free(res.R);
+	}
+
+	Decimal ret_old = ret;
+	Decimal four = decimal_from_int(4);
+	ret = decimal_mul(ret, four);
+	return ret;
+}
+
+Decimal decimal_sin(Decimal x) {
+	Decimal ret = decimal_from_int(0);
+	
+	for(int i = 0; i < 100; i++) {
+		Decimal m1 = decimal_from_int(-1);
+		Decimal sign = decimal_pow(m1, i);
+		Decimal X = decimal_pow(x, 2 * i + 1);
+		Decimal q = decimal_from_int(2 * i + 1);
+		Decimal F = decimal_factorial(q);
+
+		Decimal X2 = decimal_mul(sign, X);
+		Decimal_div_result res = decimal_div(X2, F,100);
+
+		Decimal ret_old = ret;
+		ret = decimal_add(ret, res.Q);
+
+		decimal_free(m1);
+		decimal_free(q);
+		decimal_free(sign);
+		decimal_free(X);
+		decimal_free(F);
+		decimal_free(X2);
+		decimal_free(res.Q);
+		decimal_free(res.R);
+	}
+
+	return ret;
+}
+
+Decimal decimal_cos(Decimal x) {
+
+}
+
+Decimal decimal_exp(Decimal x) {
+
+}
+Decimal decimal_ln(Decimal x) {
+
+}
+
+Decimal decimal_sqrt(Decimal x) {
+
 }
 
 Decimal decimal_add(Decimal x, Decimal y) {
@@ -423,40 +576,36 @@ Decimal decimal_add(Decimal x, Decimal y) {
 	fmt.integer = (xfmt.integer > yfmt.integer) ? xfmt.integer : yfmt.integer;
 	fmt.fraction = (xfmt.fraction > yfmt.fraction) ? xfmt.fraction : yfmt.fraction;
 
-	x = decimal_make_format(x, fmt.integer, fmt.fraction);
-	y = decimal_make_format(y, fmt.integer, fmt.fraction);
+	Decimal X = decimal_make_format(x, fmt.integer, fmt.fraction);
+	Decimal Y = decimal_make_format(y, fmt.integer, fmt.fraction);
 
-	char* str = (char*) malloc((fmt.integer + fmt.fraction + 2) / 2 + 1);
 	int overflow = 0;
 	int header = 2 + fmt.integer + fmt.fraction;
-
-	for(int i = 0; i < (fmt.integer + fmt.fraction + 2) / 2 + 1; i++) {
-		str[i] = 0;
-	}
+	
+	ret = __decimal_new(fmt.integer + fmt.fraction + 3);
 
 	for(int i = -fmt.fraction; i <= fmt.integer; i++) {
 		if(i == 0) {
 			ret.fpoint = header;
-			__decimal_write(str, header--, 0xF);
+			decimal_write(ret, header--, 0xF);
 		}
 
-		int value1 = decimal_digit(x, i);
-		int value2 = decimal_digit(y, i);
+		int value1 = decimal_digit(X, i);
+		int value2 = decimal_digit(Y, i);
 		int value = (value1 + value2 + overflow);
 		overflow = value / 10;
 
-		__decimal_write(str, header--, value % 10);
+		decimal_write(ret, header--, value % 10);
 	}
 
-	ret.ptr = str;
 	ret.len = fmt.integer + fmt.fraction + 3 + overflow;
 
 	char* old = ret.ptr;
 	ret = decimal_trim(ret);
 
 	free(old);
-	decimal_free(x);
-	decimal_free(y);
+	decimal_free(X);
+	decimal_free(Y);
 
 	return ret;
 }
@@ -503,41 +652,33 @@ Decimal decimal_sub(Decimal x, Decimal y) {
 	Decimal_format yfmt = decimal_format(y);
 	Decimal_format fmt;
 
-	char* ptr, * ptr2;
-	ptr = x.ptr;
-	ptr2 = y.ptr;
-
 	fmt.integer = (xfmt.integer > yfmt.integer) ? xfmt.integer : yfmt.integer;
 	fmt.fraction = (xfmt.fraction > yfmt.fraction) ? xfmt.fraction : yfmt.fraction;
 
-	x = decimal_make_format(x, fmt.integer, fmt.fraction);
-	y = decimal_make_format(y, fmt.integer, fmt.fraction);
+	Decimal X = decimal_make_format(x, fmt.integer, fmt.fraction);
+	Decimal Y = decimal_make_format(y, fmt.integer, fmt.fraction);
 
-	char* str = (char*) malloc((fmt.integer + fmt.fraction + 2) / 2 + 1);
+	ret = __decimal_new(fmt.integer + fmt.fraction + 3);
 	int header = 2 + fmt.integer + fmt.fraction;
-
-	for(int i = 0; i < (fmt.integer + fmt.fraction + 2) / 2 + 1; i++) {
-		str[i] = 0;
-	}
 
 	for(int i = -fmt.fraction; i <= fmt.integer; i++) {
 		if(i == 0) {
 			ret.fpoint = header;
-			__decimal_write(str, header--, 0xF);
+			decimal_write(ret, header--, 0xF);
 		}
 
-		int value1 = decimal_digit(x, i);
-		int value2 = decimal_digit(y, i);
+		int value1 = decimal_digit(X, i);
+		int value2 = decimal_digit(Y, i);
 		int value;
 
 		if(value1 >= value2) {
 			value = value1 - value2;
 		} else {
 			for(int j = i + 1; j <= fmt.integer; j++) {
-				if(decimal_digit(x, j) != 0) {
-					decimal_set_digit(x, j, decimal_digit(x, j) - 1);
+				if(decimal_digit(X, j) != 0) {
+					decimal_set_digit(X, j, decimal_digit(X, j) - 1);
 					for(int k = j - 1; k >= i + 1; k--) {
-						decimal_set_digit(x, k, 9);
+						decimal_set_digit(X, k, 9);
 					}
 					value = 10 + value1 - value2;
 
@@ -545,18 +686,15 @@ Decimal decimal_sub(Decimal x, Decimal y) {
 				}
 			}
 		}
-		__decimal_write(str, header--, value);
+		decimal_write(ret, header--, value);
 	}
-
-	ret.ptr = str;
-	ret.len = fmt.integer + fmt.fraction + 3;
 
 	char* old = ret.ptr;
 	ret = decimal_trim(ret);
 
 	free(old);
-	decimal_free(x);
-	decimal_free(y);
+	decimal_free(X);
+	decimal_free(Y);
 
 	return ret;
 }
@@ -564,6 +702,7 @@ Decimal decimal_mul(Decimal x, Decimal y) {
 	if(decimal_is_negative(x) && decimal_is_negative(y)) {
 		Decimal xneg = decimal_negative(x);
 		Decimal yneg = decimal_negative(y);
+
 		Decimal ret = decimal_mul(xneg, yneg);
 
 		decimal_free(xneg);
@@ -606,13 +745,9 @@ Decimal decimal_mul(Decimal x, Decimal y) {
 
 	for(int i = 0; i < xlen; i++) {
 		int overflow = 0;
-		char* str = (char*) malloc((ylen + 3) / 2);
-		for(int i = 0; i < (ylen + 3) / 2; i++) {
-			str[i] = 0;
-		}
-		__decimal_write(str, ylen + 2, 0xF);
-
-		Decimal temp = { str, ylen + 3, ylen + 2 };
+		Decimal temp = __decimal_new(ylen + 3);
+		decimal_write(temp, ylen + 2, 0xF);
+		temp.fpoint = ylen + 2;
 
 		for(int j = 0; j < ylen + 1; j++) {
 			int value1 = decimal_digit(X, i);
@@ -664,7 +799,7 @@ Decimal_div_result decimal_div ( Decimal x, Decimal y, int p ) {
 
 		return ret;
 	} else if( !decimal_is_negative ( x ) && decimal_is_negative ( y ) ) {
-		Decimal yneg = decimal_negative ( x );
+		Decimal yneg = decimal_negative ( y );
 		Decimal_div_result div = decimal_div ( x, yneg, p );
 		Decimal_div_result ret = { decimal_negative ( div.Q ), decimal_negative ( div.R ) };
 
@@ -675,7 +810,6 @@ Decimal_div_result decimal_div ( Decimal x, Decimal y, int p ) {
 		return ret;
 	}
 
-	Decimal_div_result ret;
 
 	Decimal_format xfmt = decimal_format ( x );
 	Decimal_format yfmt = decimal_format ( y );
@@ -721,8 +855,7 @@ Decimal_div_result decimal_div ( Decimal x, Decimal y, int p ) {
 	Decimal PQ = decimal_mul(Q, y);
 	Decimal R = decimal_sub(x, PQ);
 
-	ret.Q = decimal_trim(Q);
-	ret.R = decimal_trim(R);
+	Decimal_div_result ret = { decimal_trim(Q), decimal_trim(R) };
 
 	decimal_free(Q);
 	decimal_free(R);
@@ -731,6 +864,15 @@ Decimal_div_result decimal_div ( Decimal x, Decimal y, int p ) {
 	decimal_free(q);
 	decimal_free(N);
 	decimal_free(PQ);
+
+	return ret;
+}
+Decimal decimal_copy(Decimal x) {
+	Decimal ret = __decimal_new(x.len);
+
+	for(int i = 0; i < x.len; i++) {
+		decimal_write(ret, i, __decimal_read(x, i));
+	}
 
 	return ret;
 }
